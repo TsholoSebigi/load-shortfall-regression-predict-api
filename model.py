@@ -141,7 +141,7 @@ def _preprocess_data(data):
         #random_data.loc[(trainOneHot[feature].isnull()) & (random_predict > 0), "Ran" + feature] = random_predict[(trainOneHot[feature].isnull()) & (random_predict > 0)]
         random_data.loc[(trainOneHot[feature].isnull()) & (random_predict > 0), "Ran" + feature] = trainOneHot['Valencia_pressure'].mean()
         
-    replace with imputed data and                                                                                                               
+    #replace with imputed data and                                                                                                               
     trainOneHot['Valencia_pressure'] = random_data['RanValencia_pressure']
 
     print(trainOneHot.columns)
