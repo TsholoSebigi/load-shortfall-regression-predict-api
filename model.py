@@ -96,61 +96,42 @@ def _preprocess_data(data):
     # ---------------------------------------------------------------
 
     # ----------- Replace this code with your own preprocessing steps --------
-    #one hot encoding
-    trainOneHot              = pd.get_dummies(feature_vector_df, columns=['Valencia_wind_deg','Seville_pressure'], drop_first=True)
-    trainOneHot['Time']      =  pd.to_datetime(trainOneHot['time'])
-    trainOneHot['Year']      = [i.year  for i in trainOneHot['Time']]
-    trainOneHot['Month']     = trainOneHot['Time'].apply(lambda x: x.strftime("%b")) 
-    trainOneHot['dayOfWeek'] = trainOneHot['Time'].apply(lambda x: x.strftime("%a"))
-    trainOneHot['Hour']      = [i.hour  for i in trainOneHot['Time']]
-    trainOneHot['partOfDay'] = trainOneHot['Hour'].apply(lambda x: partOfDay(x))
-    trainOneHot['quarter']   = [i.quarter for i in trainOneHot['Time']]
-    trainOneHot['isWeekday'] = trainOneHot['Time'].apply(lambda x: 0 if x in ['Sat','Sun'] else 1)
-    trainOneHot              = pd.get_dummies(trainOneHot, columns=['dayOfWeek','Month','quarter','partOfDay'], drop_first=True)
-    trainOneHot              = trainOneHot.drop(['time','Time','Unnamed: 0'],axis=1)
+    #label
+    map_sps                         = {'sp1':1,'sp2':2,'sp3':3,'sp4':4,'sp5':5,'sp6':6,'sp7':7,'sp8':8,'sp9':9,'sp10':10,'sp11':11,
+                                   'sp12':12,'sp13':13,'sp14':14,'sp15':15,'sp16':16,'sp17':17,'sp18':18,'sp19':19,'sp20':20  ,
+                                   'sp21':21,'sp22':22,'sp23':23,'sp24':24,'sp25':25}
+    map_levels                      = {'level_1':1,'level_2':2,'level_3':3,'level_4':4,'level_5':5,'level_6':6,'level_7':7,
+                                       'level_8':8,'level_9':9,'level_10':10}
+    map_weekdays                    = {"Mon": 0,"Tue": 1,"Wed": 2,"Thu": 3,"Fri": 4,"Sat": 5,"Sun": 6}
+
+    trainLabel                      = feature_vector_df.copy()
+    trainLabel['Time']              = pd.to_datetime(trainLabel['time'])
+    trainLabel['Month']             = [i.month for i in trainLabel['Time']]
+    trainLabel['quarter']           = [i.quarter for i in trainLabel['Time']]
+    trainLabel['Year']              = [i.year  for i in trainLabel['Time']]
+    trainLabel['Hour']              = [i.hour  for i in trainLabel['Time']]
+    trainLabel['partOfDay']         = trainLabel['Hour'].apply(lambda x: partOfDay(x))
+    trainLabel['dayOfWeek']         = trainLabel['Time'].apply(lambda x: x.strftime("%a"))
+    trainLabel['Weekday']           = trainLabel["dayOfWeek"].map(map_weekdays)
+    trainLabel['Seville_pressure']  = trainLabel["Seville_pressure"].map(map_sps)
+    trainLabel['Valencia_wind_deg'] = trainLabel["Valencia_wind_deg"].map(map_levels)
+    trainLabel['isWeekday']         = trainLabel["Weekday"].apply(lambda x: 1 if x < 5 else 0)
+    trainLabel                      = trainLabel.drop(['time','Time','Unnamed: 0','dayOfWeek','Hour'],axis=1)
+
 
 
     ############################################################################
-    #Impute
-    missing_columns = ['Valencia_pressure'] # there could be multiple missing columns in other datasets
-    
-    for feature in missing_columns:
-        trainOneHot[feature + '_imp'] = trainOneHot[feature]
-        trainOneHot                   = random_imputation(trainOneHot, feature)
-        
-    
-    random_data = pd.DataFrame(columns = ["Ran" + name for name in missing_columns])
-    
-    for feature in missing_columns:
-           
-        random_data["Ran" + feature] = trainOneHot[feature + '_imp']
-    
-        parameters     = list(set(trainOneHot.columns) - set(missing_columns) - {feature + '_imp'})
-        model          = linear_model.LinearRegression()
-        model.fit(X    = trainOneHot[parameters], y = trainOneHot[feature + '_imp'])
-        
-        #Standard Error of the regression estimates is equal to std() of the errors of each estimates
-        predict        = model.predict(trainOneHot[parameters])
-        std_error      = (predict[trainOneHot[feature].notnull()] - trainOneHot.loc[trainOneHot[feature].notnull(), feature + '_imp']).std()
-        
-        #preserve the index of the missing data from the original dataframe
-        random_predict = np.random.normal(size  = trainOneHot[feature].shape[0], 
-                                         loc   = predict                      , 
-                                          scale = std_error                    )
-       
-        #random_data.loc[(trainOneHot[feature].isnull()) & (random_predict > 0), "Ran" + feature] = random_predict[(trainOneHot[feature].isnull()) & (random_predict > 0)]
-        random_data.loc[(trainOneHot[feature].isnull()) & (random_predict > 0), "Ran" + feature] = trainOneHot['Valencia_pressure'].mean()
-        
-    #replace with imputed data and                                                                                                               
-    trainOneHot['Valencia_pressure'] = random_data['RanValencia_pressure']
+    trainLabel['Valencia_pressure'].fillna(1012.0514065222828, inplace=True)
 
-    print(trainOneHot.columns)
     
-    normalize, crude at this point
+    print(trainLabel)
+    
+    #normalize, crude at this point
     scalerOneHot      = StandardScaler()
-    XtrainOneHotStd   = scalerOneHot.fit_transform(trainOneHot)
-    XtrainOneHotStdDf = pd.DataFrame(XtrainOneHotStd,columns=trainOneHot.columns)
+    XtrainOneHotStd   = scalerOneHot.fit_transform(trainLabel)
+    XtrainOneHotStdDf = pd.DataFrame(XtrainOneHotStd,columns=trainLabel.columns)
 
+    print('made it here')
     
     #predict_vector = feature_vector_df[['Madrid_wind_speed','Bilbao_rain_1h','Valencia_wind_speed']]
     # ------------------------------------------------------------------------
@@ -203,4 +184,4 @@ def make_prediction(data, model):
     # Perform prediction with model and preprocessed data.
     prediction = model.predict(prep_data)
     # Format as list for output standardisation.
-    return prediction[0].tolist()
+    return prediction.tolist()
